@@ -1,0 +1,3 @@
+Status after deployment:
+
+$(watch kubectl get pod -o wide)

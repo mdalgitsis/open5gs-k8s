@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smf-cmap
+  labels:
+    nf-type: smf
+data:
+  smf.yaml: |
+    logger:
+        file: /open5gs/smf.log
+        {{- if .Values.global_config.logs.enabled }}
+        level: {{ .Values.global_config.logs.log_level}}
+        {{- end }}
+
+    {{- if .Values.global_config.no_tls.enabled }}
+    sbi:
+      server:
+        no_tls: true
+        #cacert: @sysconfdir@/open5gs/tls/ca.crt
+        #key: @sysconfdir@/open5gs/tls/udm.key
+        #cert: @sysconfdir@/open5gs/tls/udm.crt
+      client:
+        no_tls: true
+        #cacert: @sysconfdir@/open5gs/tls/ca.crt
+        #key: @sysconfdir@/open5gs/tls/udm.key
+        #cert: @sysconfdir@/open5gs/tls/udm.crt
+    {{- end }}
+    smf:
+        sbi:     
+          - dev: {{ .Values.global_config.host.interface }}
+            port: {{ .Values.smf.container_port.sbi }}
+            {{- if .Values.global_config.sbi.advertise }}
+            advertise: smf-sbi-svc
+            {{- end }}
+        {{- if .Values.amf.configuration.metrics.enabled }}
+        metrics:
+          - addr: 0.0.0.0
+            port: 9090
+        {{- end }}
+        pfcp:
+          dev: {{ .Values.global_config.host.interface }}
+          port: {{ .Values.smf.container_port.pfcp }}
+        gtpc:
+          dev: {{ .Values.global_config.host.interface }}
+        gtpu:
+          dev: {{ .Values.global_config.host.interface }}   
+        subnet:
+          {{- .Values.smf.configuration.subnet_list | toYaml | nindent 10 }}
+        dns:
+          {{- .Values.smf.configuration.dns_list | toYaml | nindent 10 }}
+        mtu: {{ .Values.smf.configuration.mtu }}
+
+    nrf:
+      sbi:
+        - name: nrf-svc
+          port: {{ .Values.nrf.container_port.sbi }}
+
+    upf:
+      pfcp:
+        {{- .Values.smf.configuration.pfcp_upf_connection_list | toYaml | nindent 8 }}

@@ -1,0 +1,296 @@
+# Default values for open5gs-epc-helm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# open5gs
+open5gs:
+  image:
+    repository: your_repository/open5gs
+    tag: "2.6.1"
+    pullPolicy: IfNotPresent
+
+# Open5gs webui
+webui:
+  image:
+    repository: your_repository/open5gs-webui
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    port: 3000
+    target_port: 3000
+    node_port: 30080
+  replicas: 1
+  node_selector: 
+    null
+#    5g-node: "cloud-node"
+
+# mongodb
+mongodb:  
+  image:
+    repository: mongo
+    tag: "latest"  
+    pullPolicy: Always
+  container_port: 27017
+  service:  
+    port: 27017
+    target_port: 27017
+  node_selector: 
+    null
+#    5g-node: "cloud-node"
+
+
+# AMF Deployment, Service and ConfigMap
+amf:
+  service:
+    ngap: 
+      type: NodePort
+      port: 38412
+      target_port: ngap
+      node_port: 38412
+    sbi:
+      port: 7777
+      target_port: sbi
+    metrics:
+      port: 9090
+      target_port: metrics
+  replicas: 1
+  container_port:
+    ngap: 38412
+    sbi: 7777
+    metrics: 9090
+  node_selector:
+#    null 
+    5g-node: "cloud-node"
+  configuration:
+    mcc: '001'
+    mnc: '01'
+    tac: '100'
+    slice_sst_sd_list:
+      - sst: 1
+    metrics:
+      enabled: True
+      interval: "5s"
+
+
+# AUSF Deployment, Service and ConfigMap
+ausf:
+  service:
+    sbi:
+      port: 7777
+      target_port: 7777
+  replicas: 1
+  container_port:
+    sbi: 7777
+  node_selector:
+#    null 
+    5g-node: "cloud-node"
+
+# BSF Deployment, Service and ConfigMap
+bsf:
+  service:
+    sbi:
+      port: 7777
+      target_port: 7777
+  replicas: 1
+  container_port:
+    sbi: 7777
+  node_selector:
+#    null 
+    5g-node: "cloud-node"
+
+# NRF Deployment, Service and ConfigMap
+nrf:
+  service:
+    sbi:
+      port: 7777
+      target_port: 7777
+  replicas: 1
+  container_port:
+    sbi: 7777
+  node_selector: 
+#    null
+    5g-node: "cloud-node"
+
+# NSSF Deployment, Service and ConfigMap
+nssf:
+  service:
+    sbi:
+      port: 7777
+      target_port: 7777
+  replicas: 1
+  container_port:
+    sbi: 7777
+  node_selector: 
+#    null
+    5g-node: "cloud-node"
+  configuration:
+    nsi_list:
+      - addr: nrf-svc
+        port: 7777
+        s_nssai:
+          sst: 1
+
+# PCF Deployment, Service and ConfigMap
+pcf:
+  service:
+    sbi:
+      port: 7777
+      target_port: 7777
+  replicas: 1
+  container_port:
+    sbi: 7777
+  node_selector:
+#    null 
+    5g-node: "cloud-node"
+
+# UDM Deployment, Service and ConfigMap
+udm:
+  service:
+    sbi:
+      port: 7777
+      target_port: 7777
+  replicas: 1
+  container_port:
+    sbi: 7777
+  node_selector: 
+#    null  
+    5g-node: "cloud-node"
+  configuration:
+    hnet: 
+      enabled: False
+
+# UDR Deployment, Service and ConfigMap
+udr:
+  service:
+    sbi:
+      port: 7777
+      target_port: 7777
+  replicas: 1
+  container_port:
+    sbi: 7777
+  node_selector: 
+#    null
+    5g-node: "cloud-node"
+
+# SMF Deployment, Service and ConfigMap
+smf:
+  service:
+    pfcp: 
+      port: 8805
+      target_port: 8805
+    sbi:
+      port: 7777
+      target_port: 7777
+    metrics:
+      port: 9090
+      target_port: 9090
+  replicas: 1
+  container_port:
+    pfcp: 8805
+    sbi: 7777
+    metrics: 9090
+  node_selector:
+#    null 
+    5g-node: "cloud-node"
+  configuration:
+    mtu: 1400
+    dns_list:
+      - 8.8.8.8
+      - 8.8.4.4 
+    subnet_list:
+      - addr: 10.45.0.1/16
+        dnn: internet
+#      - addr: 10.46.0.1/16
+#        dnn: internet2
+    pfcp_upf_connection_list:
+      - name: upf-pfcp-svc
+        port: 8805
+#      - name: upf-pfcp-svc-2
+#        port: 8805
+    metrics:
+      enabled: True
+      interval: "5s"
+
+# UPF Deployment, Service and ConfigMap
+upf:
+  service:
+    gtpu: 
+      name: "upf-gtpu-svc"
+      port: 2152
+      target_port: 2152
+      node_port: 2152
+    pfcp:
+      name: "upf-pfcp-svc"
+      port: 8805
+      target_port: 8805
+    nodeport:
+      enabled: False
+      type: NodePort
+    loadbalancer:
+      enabled: True
+      type: LoadBalancer
+      loadBalancerIP: xxx.xxx.xxx.xxx  # metalLB pool range: 10.201.0.11-12
+  replicas: 1
+  container_port:
+    gtpu: 2152
+    pfcp: 8805
+  # default location for UPF in the cloud
+  node_selector:
+#    null 
+    5g-node: "cloud-node"
+  # if distributed_upf is enabled then the UPF will be located in the edge
+  distributed_upf: 
+    enabled: False
+    node_selector: 
+      5g-node: "edge-node"
+  configuration:
+    subnet_list:
+      - addr: 10.45.0.1/16
+        dnn: internet
+        dev: ogstun0
+#      - addr: 10.46.0.1/16
+#        dnn: ims
+#        dev: ogstun1
+    pfcp_smf_connection_list:
+       - name: smf-pfcp-svc
+         port: 8805
+
+# General configuration
+global_config:
+  sbi:
+    advertise: false
+  host:
+    interface: eth0
+  db_uri: mongodb://mongodb-svc:27017/open5gs
+  imagePullSecret:
+    enabled: True
+    name: open5gs-project-secret
+    registry: your_repository
+    username: your_username
+    password: your_password
+    image_secret_creator:
+      enabled: False
+    # log level can be set with none, fatal, error, warn, info, debug, trace
+  logs:
+    enabled: False
+    log_level: debug 
+  monitoring:
+    prometheus:
+      release:
+        name: "prometheus-5g"
+  # version 2.6.1 feature
+  no_tls: 
+    enabled: True
+
+# ADD Subscribers Automatically 
+add_subs_auto:
+  # with helm post-hook 
+  helm_post_hook:
+    enabled: False
+    type: post-install
+    weight: "1"
+    delete_policy: before-hook-creation
+    image:
+      repository: your_repository
+      tag: "0.0.1"  

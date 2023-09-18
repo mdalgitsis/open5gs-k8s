@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nrf-cmap
+  labels:
+    nf-type: nrf
+data:
+  nrf.yaml: |
+    db_uri: "{{ .Values.global_config.db_uri }}"
+    
+    logger:
+        file: /open5gs/nrf.log
+        {{- if .Values.global_config.logs.enabled }}
+        level: {{ .Values.global_config.logs.log_level}}
+        {{- end }}
+    {{- if .Values.global_config.no_tls.enabled }}
+    sbi:
+      server:
+        no_tls: true
+        #cacert: @sysconfdir@/open5gs/tls/ca.crt
+        #key: @sysconfdir@/open5gs/tls/udm.key
+        #cert: @sysconfdir@/open5gs/tls/udm.crt
+      client:
+        no_tls: true
+        #cacert: @sysconfdir@/open5gs/tls/ca.crt
+        #key: @sysconfdir@/open5gs/tls/udm.key
+        #cert: @sysconfdir@/open5gs/tls/udm.crt
+    {{- end }}
+    nrf:
+      sbi:
+        - dev: {{ .Values.global_config.host.interface }}
+          port: {{ .Values.nrf.container_port.sbi }}

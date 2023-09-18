@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: amf-cmap
+  labels:
+    nf-type: amf
+data:
+  amf.yaml: |
+    logger:
+        file: /open5gs/amf.log
+        {{- if .Values.global_config.logs.enabled }}
+        level: {{ .Values.global_config.logs.log_level}}
+        {{- end }}
+        #domain: sbi
+    {{- if .Values.global_config.no_tls.enabled }}
+    sbi:
+      server:
+        no_tls: true
+        #cacert: @sysconfdir@/open5gs/tls/ca.crt
+        #key: @sysconfdir@/open5gs/tls/udm.key
+        #cert: @sysconfdir@/open5gs/tls/udm.crt
+      client:
+        no_tls: true
+        #cacert: @sysconfdir@/open5gs/tls/ca.crt
+        #key: @sysconfdir@/open5gs/tls/udm.key
+        #cert: @sysconfdir@/open5gs/tls/udm.crt
+    {{- end }}
+    amf:
+        sbi:
+          - dev: {{ .Values.global_config.host.interface }}
+            port: {{ .Values.amf.container_port.sbi}}
+            {{- if .Values.global_config.sbi.advertise }}
+            advertise: amf-sbi-svc
+            {{- end }}
+        ngap:
+          - dev: {{ .Values.global_config.host.interface }}
+            port: {{ .Values.amf.container_port.ngap}}
+        {{- if .Values.amf.configuration.metrics.enabled }}
+        metrics:
+          - addr: 0.0.0.0
+            port: 9090
+        {{- end }}
+        guami:
+          - plmn_id:
+              mcc: {{ .Values.amf.configuration.mcc }}
+              mnc: {{ .Values.amf.configuration.mnc }}
+            amf_id:
+              region: 2
+              set: 1
+        tai:
+          - plmn_id:
+              mcc: {{ .Values.amf.configuration.mcc }}
+              mnc: {{ .Values.amf.configuration.mnc }}
+            tac: {{ .Values.amf.configuration.tac }}
+        plmn_support:
+          - plmn_id:
+              mcc: {{ .Values.amf.configuration.mcc }}
+              mnc: {{ .Values.amf.configuration.mnc }}
+            s_nssai:
+              {{- .Values.amf.configuration.slice_sst_sd_list | toYaml | nindent 14 }}
+        security:
+            integrity_order : [ NIA2, NIA1, NIA0 ]
+            ciphering_order : [ NEA0, NEA1, NEA2 ]
+        network_name:
+            full: Open5GS
+        amf_name: open5gs-amf0
+
+    nrf:
+      sbi:
+        - name: nrf-svc
+          port: {{ .Values.nrf.container_port.sbi}}

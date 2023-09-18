@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bsf-svc
+  labels:
+    nf-type: bsf
+spec:
+  selector:
+    nf-type: bsf
+  ports:
+    - name: sbi
+      protocol: TCP
+      port: {{ .Values.bsf.service.sbi.port }}      
+      targetPort: {{ .Values.bsf.service.sbi.target_port }}   
+---  
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: bsf-depl
+  labels:
+    nf-type: bsf
+spec:
+  replicas: {{ .Values.bsf.replicas }}
+  selector:
+    matchLabels:
+      nf-type: bsf
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/bsf-cmap.yaml") . | sha256sum }}
+      labels:
+        nf-type: bsf
+    spec:    
+      containers:
+        - name: bsf
+          image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+          imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+          command: ["/bin/sh"]
+          args: ["-c", "/open5gs/install/bin/open5gs-bsfd -c /open5gs/config-map/bsf.yaml"]
+          ports:
+            - name: sbi
+              containerPort: {{ .Values.bsf.container_port.sbi }}
+          volumeMounts:
+          - name: bsf-cmap
+            mountPath: /open5gs/config-map/bsf.yaml
+            subPath: "bsf.yaml"
+      {{- if .Values.global_config.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: "{{ .Values.global_config.imagePullSecret.name }}"
+      {{- end }}
+      volumes:
+        - name: bsf-cmap
+          configMap:
+            name: bsf-cmap
+      nodeSelector:
+        {{- .Values.bsf.node_selector | toYaml | nindent 8 }}

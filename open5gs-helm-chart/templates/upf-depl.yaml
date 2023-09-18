@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.upf.service.pfcp.name}}
+  labels:
+    nf-type: upf
+spec:
+  selector:
+    nf-type: upf
+  ports:
+    - name: pfcp
+      protocol: UDP
+      port: {{ .Values.upf.service.pfcp.port }}   
+      targetPort: {{ .Values.upf.service.pfcp.target_port }}   
+  type: ClusterIP
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.upf.service.gtpu.name}}
+  labels:
+    nf-type: upf
+spec:
+  selector:
+    nf-type: upf
+  {{- if .Values.upf.service.nodeport.enabled }}
+  ports:
+    - name: gtpu
+      protocol: UDP
+      port: {{ .Values.upf.service.gtpu.port }}   
+      targetPort: {{ .Values.upf.service.gtpu.target_port }}   
+      nodePort: {{ .Values.upf.service.gtpu.node_port }}   
+  type: {{ .Values.upf.service.nodeport.type }}   
+  {{- else }}
+  ports:
+    - name: gtpu
+      protocol: UDP
+      port: {{ .Values.upf.service.gtpu.port }}   
+      targetPort: {{ .Values.upf.service.gtpu.target_port }}     
+  type: {{ .Values.upf.service.loadbalancer.type }}
+  loadBalancerIP: {{ .Values.upf.service.loadbalancer.loadBalancerIP }}
+  {{- end }}
+---
+
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata: # metadata on the deployment
+  name: upf-depl
+  labels:
+    nf-type: upf
+spec: # desired state of deployment
+  replicas: {{ .Values.upf.replicas }}
+  selector:
+    matchLabels:
+      nf-type: upf
+  template: 
+    metadata: # metadata on the pod
+      annotations:
+        checksum/config1: {{ include (print $.Template.BasePath "/upf-cmap.yaml") . | sha256sum }}
+        checksum/config2: {{ include (print $.Template.BasePath "/upf-tun-interface-cmap.yaml") . | sha256sum }}
+      labels:
+        nf-type: upf
+    spec: # desired state of pod
+      initContainers:
+        - name: tun-interface-create
+          image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+          imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+          command: ["/bin/sh", "-c", "/tun-interface.sh"]
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["NET_ADMIN"]
+          volumeMounts:
+            - name: tun-interface-cmap
+              mountPath:  /tun-interface.sh
+              subPath: tun-interface.sh
+      containers:
+        - name: upf
+          image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+          imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["NET_ADMIN"]
+          command: ["/bin/sh"]
+          args: ["-c", "/open5gs/install/bin/open5gs-upfd -c /open5gs/config-map/upf.yaml"]
+          ports:
+            - name: pfcp
+              containerPort: {{ .Values.upf.container_port.pfcp }}
+              protocol: UDP
+            - name: gtpu
+              containerPort: {{ .Values.upf.container_port.gtpu }}
+              protocol: UDP
+          volumeMounts: #  where to mount volumes into containers in
+          - name: upf-cmap
+            mountPath: /open5gs/config-map/upf.yaml
+            subPath: "upf.yaml"
+          - name: dev-net-tun
+            mountPath: /dev/net/tun 
+      {{- if .Values.global_config.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: "{{ .Values.global_config.imagePullSecret.name }}"
+      {{- end }}
+      volumes:
+        - name: upf-cmap
+          configMap:
+            name: upf-cmap
+        - name: dev-net-tun
+          hostPath:
+            path: /dev/net/tun
+        - name: tun-interface-cmap
+          configMap:
+            name: tun-interface-cmap
+            defaultMode: 0777
+      nodeSelector:
+        {{- if .Values.upf.distributed_upf.enabled }}
+        {{- .Values.upf.distributed_upf.node_selector | toYaml | nindent 8 }}
+        {{- else }}
+        {{- .Values.upf.node_selector | toYaml | nindent 8 }}
+        {{- end }}
+        

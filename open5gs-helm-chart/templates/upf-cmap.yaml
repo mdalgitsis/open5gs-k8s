@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: upf-cmap
+  labels:
+    nf-type: upf
+data:
+  upf.yaml: |
+    logger:
+        file: /open5gs/upf.log
+        {{- if .Values.global_config.logs.enabled }}
+        level: {{ .Values.global_config.logs.log_level}}
+        {{- end }}
+    upf:
+        pfcp:
+          - dev: {{ .Values.global_config.host.interface }} # Host IP
+            port: {{ .Values.upf.container_port.pfcp}}
+        gtpu:
+          - dev: {{ .Values.global_config.host.interface }} # Host IP
+            port: {{ .Values.upf.container_port.gtpu}}
+            advertise: {{ .Values.upf.service.gtpu.name}}
+        subnet:
+          {{- .Values.upf.configuration.subnet_list | toYaml | nindent 10 }}
+    
+    smf:
+        pfcp:
+          {{- .Values.upf.configuration.pfcp_smf_connection_list | toYaml | nindent 10 }}

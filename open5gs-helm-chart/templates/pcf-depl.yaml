@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pcf-svc
+  labels:
+    nf-type: pcf
+spec:
+  selector:
+    nf-type: pcf
+  ports:
+    - name: sbi
+      protocol: TCP
+      port: {{ .Values.pcf.service.sbi.port }}     
+      targetPort: {{ .Values.pcf.service.sbi.target_port }}     
+---  
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: pcf-depl
+  labels:
+    nf-type: pcf
+spec:
+  replicas: {{ .Values.pcf.replicas }}     
+  selector:
+    matchLabels:
+      nf-type: pcf
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/pcf-cmap.yaml") . | sha256sum }}
+      labels:
+        nf-type: pcf
+    spec:    
+      containers:
+        - name: pcf
+          image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+          imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+          command: ["/bin/sh"]
+          args: ["-c", "/open5gs/install/bin/open5gs-pcfd -c /open5gs/config-map/pcf.yaml"]
+          ports: 
+            - name: sbi
+              containerPort: {{ .Values.pcf.container_port.sbi }}
+          volumeMounts:
+          - name: pcf-cmap
+            mountPath: /open5gs/config-map/pcf.yaml
+            subPath: "pcf.yaml"          
+      {{- if .Values.global_config.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: "{{ .Values.global_config.imagePullSecret.name }}"
+      {{- end }}
+      volumes:
+        - name: pcf-cmap
+          configMap:
+            name: pcf-cmap  
+      nodeSelector:
+        {{- .Values.pcf.node_selector | toYaml | nindent 8 }}

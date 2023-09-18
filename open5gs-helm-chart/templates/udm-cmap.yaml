@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: udm-cmap
+  labels:
+    nf-type: udm
+data:
+  udm.yaml: |
+    logger:
+        file: /open5gs/udm.log
+        {{- if .Values.global_config.logs.enabled }}
+        level: {{ .Values.global_config.logs.log_level}}
+        {{- end }}
+    {{- if .Values.global_config.no_tls.enabled }}
+    sbi:
+      server:
+        no_tls: true
+        #cacert: @sysconfdir@/open5gs/tls/ca.crt
+        #key: @sysconfdir@/open5gs/tls/udm.key
+        #cert: @sysconfdir@/open5gs/tls/udm.crt
+      client:
+        no_tls: true
+        #cacert: @sysconfdir@/open5gs/tls/ca.crt
+        #key: @sysconfdir@/open5gs/tls/udm.key
+        #cert: @sysconfdir@/open5gs/tls/udm.crt
+    {{- end }}
+    udm:
+      {{- if .Values.udm.configuration.hnet.enabled }}
+      hnet:
+        - id: 1
+          scheme: 1
+          key: @sysconfdir@/open5gs/hnet/curve25519-1.key
+        - id: 2
+          scheme: 2
+          key: @sysconfdir@/open5gs/hnet/secp256r1-2.key
+        - id: 3
+          scheme: 1
+          key: @sysconfdir@/open5gs/hnet/curve25519-3.key
+        - id: 4
+          scheme: 2
+          key: @sysconfdir@/open5gs/hnet/secp256r1-4.key
+        - id: 5
+          scheme: 1
+          key: @sysconfdir@/open5gs/hnet/curve25519-5.key
+        - id: 6
+          scheme: 2
+          key: @sysconfdir@/open5gs/hnet/secp256r1-6.key
+      {{- end }}
+      sbi:   
+        - dev: {{ .Values.global_config.host.interface }}
+          port: {{ .Values.udm.container_port.sbi }}
+          {{- if .Values.global_config.sbi.advertise }}
+          advertise: udm-svc
+          {{- end }}
+        
+    
+    nrf:
+      sbi:
+        - name: nrf-svc
+          port: {{ .Values.nrf.container_port.sbi }}

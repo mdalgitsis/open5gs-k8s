@@ -1,0 +1,57 @@
+{{- if .Values.add_subs_auto.helm_post_hook.enabled }}
+apiVersion: batch/v1 
+kind: Job 
+metadata:   
+  name: add-subs-job   
+  labels:     
+    app: open5gs-mongodb-subs
+  annotations:
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": {{ .Values.add_subs_auto.helm_post_hook.type }}
+    "helm.sh/hook-weight": "{{ .Values.add_subs_auto.helm_post_hook.weight }}"
+    "helm.sh/hook-delete-policy": {{ .Values.add_subs_auto.helm_post_hook.delete_policy }}
+spec:   
+  template:     
+    metadata:            
+      labels:         
+        app: open5gs-mongodb-subs  
+    spec:       
+      restartPolicy: OnFailure
+      containers:       
+      - name: add-subs         
+        image: "{{ .Values.add_subs_auto.helm_post_hook.image.repository }}:{{ .Values.add_subs_auto.helm_post_hook.image.tag }}"         
+        command: ["/bin/sh", "-c"]
+        args: 
+          - |
+            while : 
+            do 
+              status="$(curl -s -o /dev/null -w "%{http_code}" http://open5gs-webui:3000)"
+              echo $status
+              echo "trying to check connection with open5gs-webui"
+              if [ "$status" = "200" ]
+              then
+                echo "open5gs-webui is responsive"
+                sleep 1
+                break
+              else
+                echo "open5gs-webui is not responsive"
+              fi
+            done
+              printf '\n'
+            mongoimport --uri 'mongodb://mongodb-svc:27017' --db open5gs --collection subscribers --file /subscribers/subs_5g.json --type json --jsonArray    
+        volumeMounts:
+        - name: mongodb-subs-cmap
+          mountPath: /subscribers/subs_5g.json
+          subPath: "subs_5g.json"
+      {{- if .Values.global_config.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: "{{ .Values.global_config.imagePullSecret.name }}"
+      {{- end }}
+      volumes:
+      - name: mongodb-subs-cmap
+        configMap: 
+          name: mongodb-subs-cmap
+      nodeSelector:
+        {{- .Values.mongodb.node_selector | toYaml | nindent 8 }}
+{{- end }}

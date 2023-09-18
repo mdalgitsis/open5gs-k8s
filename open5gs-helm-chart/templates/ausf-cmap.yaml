@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ausf-cmap
+  labels:
+    nf-type: ausf
+data:
+  ausf.yaml: |
+    logger:
+        file: /open5gs/ausf.log
+        {{- if .Values.global_config.logs.enabled }}
+        level: {{ .Values.global_config.logs.log_level}}
+        {{- end }}
+    {{- if .Values.global_config.no_tls.enabled }}
+    sbi:
+      server:
+        no_tls: true
+        #cacert: @sysconfdir@/open5gs/tls/ca.crt
+        #key: @sysconfdir@/open5gs/tls/udm.key
+        #cert: @sysconfdir@/open5gs/tls/udm.crt
+      client:
+        no_tls: true
+        #cacert: @sysconfdir@/open5gs/tls/ca.crt
+        #key: @sysconfdir@/open5gs/tls/udm.key
+        #cert: @sysconfdir@/open5gs/tls/udm.crt
+    {{- end }}
+    ausf:
+      sbi:
+        - dev: {{ .Values.global_config.host.interface }}
+          port: {{ .Values.ausf.container_port.sbi }}
+          {{- if .Values.global_config.sbi.advertise }}
+          advertise: ausf-svc
+          {{- end }}
+
+    nrf:
+      sbi:
+        - name: nrf-svc
+          port: {{ .Values.nrf.container_port.sbi }}
