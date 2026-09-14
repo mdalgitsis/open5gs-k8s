@@ -1,25 +1,26 @@
 # Open5GS 5G Core on Kubernetes
 
+[![helm-lint](https://github.com/mdalgitsis/open5gs-k8s/actions/workflows/helm-lint.yml/badge.svg)](https://github.com/mdalgitsis/open5gs-k8s/actions/workflows/helm-lint.yml)
 [![Helm](https://img.shields.io/badge/Helm-v3-0F1689?logo=helm&logoColor=white)](https://helm.sh)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.24%2B-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io)
 [![Open5GS](https://img.shields.io/badge/Open5GS-2.6.1-00A98F)](https://open5gs.org)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-A Helm chart that deploys a complete **Open5GS 5G Standalone (SA) core network** on Kubernetes, designed for
-edge-computing research and testbeds. Unlike a flat single-cluster deployment, this chart treats the **User Plane
-Function as a relocatable component**: the UPF can be pinned to edge nodes while the control plane stays in the
-cloud, which is the topology that matters for low-latency MEC use cases.
+A complete, runnable **5G Standalone testbed on Kubernetes**: the Open5GS core, a simulated RAN and UE, subscriber
+provisioning, and a relocatable User Plane Function you can pin to edge nodes. Built for edge-computing research,
+and packaged so someone else can actually reproduce it.
 
 <p align="center">
   <img src="docs/images/5g-core-on-kubernetes.gif"
        alt="Animated walkthrough of a 5G core running on Kubernetes: AMF, NRF, SMF, PCF and UPF as Deployments, Pods, Services and ConfigMaps, with the N2, N3, N4 and N6 reference points drawn across them"
        width="720">
 </p>
-<p align="center"><em>3GPP reference points mapped onto Kubernetes objects — control plane (red) and user plane (blue).</em></p>
+<p align="center"><em>3GPP reference points mapped onto Kubernetes objects. Boxes are Deployments, Pods,
+Services and ConfigMaps; dashed lines trace the control-plane (red) and user-plane (blue) paths.</em></p>
 
 ## Research context
 
-The testbed this chart was built for backs two peer-reviewed publications on network slice federation:
+The testbed behind these charts backs two peer-reviewed publications on network slice federation:
 
 > **[1]** M. Dalgitsis, N. Cadenelli, M. A. Serrano, N. Bartzoudis, L. Alonso, A. Antonopoulos,
 > "NSFaaS: Network Slice Federation as a Service in Cloud-Native 5G and Beyond Mobile Networks,"
@@ -31,32 +32,50 @@ The testbed this chart was built for backs two peer-reviewed publications on net
 > Mobile Networks," *IEEE Transactions on Vehicular Technology*, vol. 73, pp. 9306–9319, 2024.
 > [doi:10.1109/TVT.2024.3362583](https://doi.org/10.1109/TVT.2024.3362583)
 
-The S-NSSAI slicing support and the cloud/edge UPF split below are the mechanisms those papers measure.
+The S-NSSAI slicing support and the cloud/edge UPF split documented below are the mechanisms those papers measure.
 
-## Why this chart
+## Why this repository
 
-Most Open5GS-on-Kubernetes charts deploy all network functions as interchangeable pods on whatever node the
-scheduler picks. That is fine for a functional test and useless for studying edge offload. This chart adds the
-pieces that a real edge testbed needs:
+Most Open5GS-on-Kubernetes charts deploy every network function as an interchangeable pod on whatever node the
+scheduler picks. That is fine for a functional test and useless for studying edge offload. This repository adds
+the pieces a real edge testbed needs:
 
-- **Distributed UPF placement** — a single flag moves the UPF to edge nodes while the control plane (AMF, SMF,
-  NRF, …) stays in the cloud, so you can measure the latency difference that edge user-plane placement buys you.
-- **External N3 exposure** — GTP-U is published through MetalLB `LoadBalancer` or `NodePort`, so a real gNB
-  outside the cluster can attach.
-- **SCTP-aware N2** — the NGAP service is declared with `protocol: SCTP`, which most charts get wrong.
-- **Network slicing** — S-NSSAI lists on the AMF and an NSSF `nsi_list`, so you can run more than one slice.
-- **Prometheus integration** — AMF and SMF metrics endpoints with `ServiceMonitor` resources for
-  kube-prometheus-stack.
-- **Automated subscriber provisioning** — a post-install Helm hook imports subscribers into MongoDB, so a fresh
-  install comes up with UEs already registered instead of requiring manual WebUI clicks.
-- **TUN device bootstrapping** — an init container creates the `ogstun` devices, sets up IP forwarding and
-  installs the `MASQUERADE` rule for each configured DNN.
+- **Distributed UPF placement** — one flag moves the UPF to edge nodes while the control plane stays in the
+  cloud, so the latency difference that edge user-plane placement buys you is actually measurable.
+- **A second, independent UPF** — [`charts/upf`](charts/upf) deploys an additional UPF at another site on its own
+  DNN and TUN device, registering back to the central SMF over N4. That is the multi-site offload topology.
+- **External N3 exposure** — GTP-U published through MetalLB `LoadBalancer` or `NodePort`, so a real or simulated
+  gNB outside the cluster can attach.
+- **SCTP-aware N2** — the NGAP service is declared `protocol: SCTP`, which most charts get wrong.
+- **Network slicing** — S-NSSAI lists on the AMF, an NSSF `nsi_list`, and per-subscriber slice assignment.
+- **Prometheus integration** — AMF and SMF metrics endpoints with `ServiceMonitor` resources.
+- **A simulated RAN and UE** — [`charts/ueransim`](charts/ueransim) runs UERANSIM so you can drive real traffic
+  through the core without hardware.
+- **Reproducible images** — [`docker/`](docker/) holds every Dockerfile the charts depend on.
+
+## Repository layout
+
+```
+charts/
+  open5gs/       Full 5G SA core: NRF AMF AUSF UDM UDR PCF BSF NSSF SMF UPF + MongoDB + WebUI
+  upf/           Standalone UPF for a second site, on its own DNN and TUN device
+  ueransim/      UERANSIM gNodeB and UE simulator
+  subscribers/   Subscriber import job, usable independently of the core install
+docker/          Dockerfiles for Open5GS 2.4.8-2.6.6, the WebUI, UERANSIM and the import tooling
+deploy/metallb/  IPAddressPool and L2Advertisement examples for exposing GTP-U
+docs/images/     Diagrams
+```
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-    gNB["gNB / RAN simulator"]
+    subgraph edge["Edge node &nbsp;&nbsp;(5g-node=edge-node)"]
+        direction TB
+        GNB["UERANSIM gNB<br/>charts/ueransim"]
+        UE["UERANSIM UE<br/>uesimtun0"]
+        UPF["UPF<br/>ogstun + NAT"]
+    end
 
     subgraph cloud["Cloud node &nbsp;&nbsp;(5g-node=cloud-node)"]
         direction TB
@@ -75,16 +94,13 @@ flowchart TB
         WEBUI["WebUI<br/>:30080"]
     end
 
-    subgraph edge["Edge node &nbsp;&nbsp;(5g-node=edge-node)"]
-        UPF["UPF<br/>ogstun + NAT"]
-    end
-
     DN(["Data network / Internet"])
 
-    gNB -- "N2 &nbsp;NGAP/SCTP :38412" --> AMF
-    gNB -- "N3 &nbsp;GTP-U/UDP :2152" --> UPF
+    UE -- "radio link sim" --> GNB
+    GNB -- "N2 &nbsp;NGAP/SCTP :38412" --> AMF
+    GNB -- "N3 &nbsp;GTP-U/UDP :2152" --> UPF
     SMF -- "N4 &nbsp;PFCP/UDP :8805" --> UPF
-    UPF --> DN
+    UPF -- "N6" --> DN
 
     UDR --- MONGO
     WEBUI --- MONGO
@@ -95,76 +111,115 @@ flowchart TB
     class edge edgebox
 ```
 
-When `upf.distributed_upf.enabled` is `false`, the UPF is scheduled with the same node selector as the rest of
-the core and the deployment collapses into a single-site topology.
+With `upf.distributed_upf.enabled: false` the UPF is scheduled alongside the control plane and the topology
+collapses to a single site.
 
-## What gets deployed
+## Charts
 
-| Component | Kind | Interfaces exposed | Notes |
-|---|---|---|---|
-| **NRF** | Deployment + ClusterIP | SBI `7777` | Service discovery; every NF registers here |
-| **AMF** | Deployment + ClusterIP + NodePort | SBI `7777`, NGAP `38412/SCTP`, metrics `9090` | N2 termination, `ServiceMonitor` included |
-| **AUSF** | Deployment + ClusterIP | SBI `7777` | Authentication |
-| **UDM** | Deployment + ClusterIP | SBI `7777` | Optional home-network public-key (`hnet`) support |
-| **UDR** | Deployment + ClusterIP | SBI `7777` | Backed by MongoDB |
-| **PCF** | Deployment + ClusterIP | SBI `7777` | Policy |
-| **BSF** | Deployment + ClusterIP | SBI `7777` | Binding support |
-| **NSSF** | Deployment + ClusterIP | SBI `7777` | Slice selection via `nsi_list` |
-| **SMF** | Deployment + ClusterIP | SBI `7777`, PFCP `8805/UDP`, metrics `9090` | Session management, `ServiceMonitor` included |
-| **UPF** | Deployment + ClusterIP + LB/NodePort | PFCP `8805/UDP`, GTP-U `2152/UDP` | Privileged; creates TUN devices, relocatable to edge |
-| **MongoDB** | Deployment + ClusterIP | `27017` | Subscriber database |
-| **WebUI** | Deployment + NodePort | `3000` → `30080` | Open5GS subscriber management UI |
+| Chart | Purpose | Key values |
+|---|---|---|
+| [`charts/open5gs`](charts/open5gs) | The whole core plus MongoDB and the WebUI | `upf.distributed_upf`, `amf.configuration.slice_sst_sd_list`, `smf.configuration.subnet_list` |
+| [`charts/upf`](charts/upf) | A second UPF at another site, DNN `internet2` on `ogstun2` | `upf.configuration.pfcp_smf_connection_list`, `upf.service.loadbalancer` |
+| [`charts/ueransim`](charts/ueransim) | gNodeB + UE simulator | `gnb.amf.ip`, `ue.key`, `ue.apnList`, `slices` |
+| [`charts/subscribers`](charts/subscribers) | Import subscribers into MongoDB | `subscriber_info` |
+
+## What the core chart deploys
+
+| Component | Interfaces exposed | Notes |
+|---|---|---|
+| **NRF** | SBI `7777` | Service discovery; every NF registers here |
+| **AMF** | SBI `7777`, NGAP `38412/SCTP`, metrics `9090` | N2 termination, `ServiceMonitor` included |
+| **AUSF** / **UDM** / **UDR** | SBI `7777` | Authentication and subscriber data; UDR backed by MongoDB |
+| **PCF** / **BSF** | SBI `7777` | Policy and binding support |
+| **NSSF** | SBI `7777` | Slice selection via `nsi_list` |
+| **SMF** | SBI `7777`, PFCP `8805/UDP`, metrics `9090` | Session management, `ServiceMonitor` included |
+| **UPF** | PFCP `8805/UDP`, GTP-U `2152/UDP` | Privileged; creates TUN devices, relocatable to edge |
+| **MongoDB** | `27017` | Subscriber database |
+| **WebUI** | `3000` → NodePort `30080` | Subscriber management UI (default login `admin` / `1423`) |
 
 ## Prerequisites
 
-- Kubernetes **1.24+** with a CNI that supports `NET_ADMIN` and privileged pods (the UPF needs both to create
-  its TUN devices).
+- Kubernetes **1.24+** with a CNI that permits `NET_ADMIN` and privileged pods — the UPF and the UERANSIM UE both
+  create TUN devices.
 - **Helm 3**.
-- **MetalLB** (or another `LoadBalancer` provider) if you want external GTP-U through a load balancer. Otherwise
-  set `upf.service.nodeport.enabled: true` and use a `NodePort`.
-- **kube-prometheus-stack** if you want the `ServiceMonitor` resources to be picked up.
+- **MetalLB** or another `LoadBalancer` provider for external GTP-U. Otherwise set
+  `upf.service.nodeport.enabled: true`. Examples live in [`deploy/metallb`](deploy/metallb) — edit the address
+  range to one your network actually owns before applying.
+- **kube-prometheus-stack** if you want the `ServiceMonitor` resources picked up.
 - Nodes labelled for placement:
 
   ```bash
   kubectl label node <cloud-node> 5g-node=cloud-node
-  kubectl label node <edge-node>  5g-node=edge-node   # only for distributed UPF
+  kubectl label node <edge-node>  5g-node=edge-node   # only for distributed UPF / RAN
   ```
 
-### Container images
+## Container images
 
-The chart does not pin a public image, but **this repository ships the Dockerfiles it expects** — see
-[`docker/`](docker/) for Open5GS 2.4.8 through 2.6.6, the WebUI, the subscriber-import tooling, and a UERANSIM
-UE/gNB simulator.
+No public image is pinned, but **every Dockerfile the charts need is in this repository** — see
+[`docker/`](docker/).
 
 ```bash
-docker build -t <registry>/open5gs:2.6.1 docker/open5gs/2.6.1
+docker build -t <registry>/open5gs:2.6.1  docker/open5gs/2.6.1
+docker build -t <registry>/ueransim:3.2.6 docker/ueransim
 docker push  <registry>/open5gs:2.6.1
-
-helm install open5gs ./open5gs-helm-chart \
-  --set open5gs.image.repository=<registry>/open5gs \
-  --set open5gs.image.tag=2.6.1
+docker push  <registry>/ueransim:3.2.6
 ```
 
-> Open5GS builds **before 2.5.9** do not include the Prometheus metrics implementation. Use 2.5.9 or later if
-> you want the AMF/SMF metrics endpoints to return anything.
+> Open5GS builds **before 2.5.9** omit the Prometheus metrics implementation. Use 2.5.9 or later or the
+> ServiceMonitors will be created and scrape nothing.
 
-## Quick start
+## End-to-end bring-up
 
 ```bash
-git clone https://github.com/mdalgitsis/open5gs.git
-cd open5gs
-
-# Label at least one node for the control plane
+git clone https://github.com/mdalgitsis/open5gs-k8s.git
+cd open5gs-k8s
 kubectl label node <node> 5g-node=cloud-node
+```
 
-# Review and edit the values you need (image repository, MetalLB IP, PLMN)
-$EDITOR open5gs-helm-chart/values.yaml
+**1. Deploy the core.**
 
-helm install open5gs ./open5gs-helm-chart --namespace open5gs --create-namespace
+```bash
+helm install open5gs charts/open5gs -n open5gs --create-namespace \
+  --set open5gs.image.repository=<registry>/open5gs \
+  --set open5gs.image.tag=2.6.1 \
+  --set upf.service.loadbalancer.loadBalancerIP=<ip-in-your-metallb-pool>
+
 kubectl get pods -n open5gs -o wide -w
 ```
 
-Bring-up order is handled by the NRF being reachable first; NFs that start before it retry their registration.
+**2. Add subscribers.** Either enable the post-install hook on the core chart, or run the standalone chart —
+whose IMSIs must match what the UE will present:
+
+```bash
+helm install subs charts/subscribers -n open5gs \
+  --set add_subscribers.image.repository=<registry>/open5gs-subscribers
+```
+
+**3. Attach a simulated RAN and UE.**
+
+```bash
+helm install ueransim charts/ueransim -n open5gs \
+  --set ueransim.image.repository=<registry>/ueransim \
+  --set gnb.amf.ip=<node-ip-exposing-the-ngap-nodeport> \
+  --set gnb.start_gnb.enabled=true \
+  --set ue.start_ue.enabled=true
+```
+
+Leave `start_gnb` / `start_ue` off to get shells you can drive by hand:
+
+```bash
+kubectl exec -it -n open5gs deploy/gnb-depl -- ./nr-gnb -c config/open5gs-gnb.yaml
+kubectl exec -it -n open5gs deploy/ue-depl  -- ./nr-ue  -c config/open5gs-ue.yaml
+```
+
+**4. Verify the session carries traffic.** The UE gets a `uesimtun0` interface; bind to it:
+
+```bash
+kubectl exec -it -n open5gs deploy/ue-depl -- ping -I uesimtun0 8.8.8.8
+kubectl exec -it -n open5gs deploy/ue-depl -- curl --interface uesimtun0 https://example.com/
+```
+
+Traffic leaving `uesimtun0` has traversed the full path: radio-link simulation → gNB → N3 GTP-U → UPF → NAT → N6.
 
 ## Configuration
 
@@ -172,13 +227,13 @@ Bring-up order is handled by the NRF being reachable first; NFs that start befor
 
 | Value | Default | Description |
 |---|---|---|
-| `amf.configuration.mcc` | `001` | Mobile Country Code |
-| `amf.configuration.mnc` | `01` | Mobile Network Code |
+| `amf.configuration.mcc` / `.mnc` | `001` / `01` | PLMN identity — must match `plmn` in the UERANSIM chart |
 | `amf.configuration.tac` | `100` | Tracking Area Code |
 | `amf.configuration.slice_sst_sd_list` | `[{sst: 1}]` | S-NSSAIs advertised by the AMF |
-| `nssf.configuration.nsi_list` | NRF at `nrf-svc:7777`, `sst: 1` | Network slice instances known to the NSSF |
+| `nssf.configuration.nsi_list` | NRF at `nrf-svc:7777`, `sst: 1` | Slice instances known to the NSSF |
 
-To run a second slice, add the S-NSSAI to both the AMF list and the NSSF `nsi_list`:
+A slice has to be declared consistently in **four** places or attach fails: the AMF list, the NSSF `nsi_list`,
+the subscriber's `slice` in `charts/subscribers`, and the UE's `apnList[].slice` in `charts/ueransim`.
 
 ```yaml
 amf:
@@ -194,12 +249,12 @@ amf:
 | Value | Default | Description |
 |---|---|---|
 | `smf.configuration.subnet_list` | `10.45.0.1/16` → `internet` | UE address pools per DNN |
-| `smf.configuration.dns_list` | `8.8.8.8`, `8.8.4.4` | DNS servers signalled to UEs |
+| `smf.configuration.dns_list` | `8.8.8.8`, `8.8.4.4` | DNS signalled to UEs |
 | `smf.configuration.mtu` | `1400` | UE MTU |
 | `upf.configuration.subnet_list` | `10.45.0.1/16` → `internet` on `ogstun0` | Must mirror the SMF pools; `dev` names the TUN device |
 
 `values.yaml` ships commented examples for a second DNN (`10.46.0.1/16` on `ogstun1`). Uncomment the matching
-entries in **both** the SMF and UPF lists — a mismatch shows up as sessions that establish and then blackhole.
+entries in **both** SMF and UPF lists — a mismatch shows up as sessions that establish and then blackhole.
 
 ### Distributed UPF (edge placement)
 
@@ -211,9 +266,22 @@ upf:
       5g-node: "edge-node"
 ```
 
-With this enabled the UPF pod is scheduled onto edge-labelled nodes while every control-plane NF stays on the
-cloud nodes. N4 (PFCP) then crosses the cloud–edge link, and N3 (GTP-U) terminates at the edge — which is the
-whole point: user traffic never traverses the backhaul to the central site.
+N4 then crosses the cloud–edge link while N3 terminates at the edge, so user traffic never traverses the backhaul
+to the central site.
+
+### A second UPF at another site
+
+[`charts/upf`](charts/upf) installs an independent UPF serving DNN `internet2` on `ogstun2`, pointing back at the
+central SMF:
+
+```bash
+helm install upf-edge charts/upf -n open5gs \
+  --set open5gs.image.repository=<registry>/open5gs \
+  --set upf.distributed_upf.enabled=true
+```
+
+> If that UPF runs in a **different cluster** from the SMF, `upf.configuration.pfcp_smf_connection_list[].name`
+> cannot stay a ClusterIP service name — expose the SMF's N4 as a NodePort or LoadBalancer and use that address.
 
 ### External N3 exposure
 
@@ -222,13 +290,13 @@ upf:
   service:
     loadbalancer:
       enabled: true
-      loadBalancerIP: 10.0.0.50     # must sit inside your MetalLB pool
+      loadBalancerIP: ""      # an address inside your MetalLB pool
     nodeport:
-      enabled: false                # set true to use a NodePort instead
+      enabled: false          # true to use a NodePort instead
 ```
 
-> The chart selects `NodePort` when `upf.service.nodeport.enabled` is `true`, and the `LoadBalancer` type
-> otherwise. Set `loadBalancerIP` to an address your provider actually owns, or the service stays `<pending>`.
+The chart picks `NodePort` when `upf.service.nodeport.enabled` is true and `LoadBalancer` otherwise. An IP your
+provider does not own leaves the service `<pending>` forever.
 
 ### Monitoring
 
@@ -242,23 +310,31 @@ global_config:
         name: "prometheus-5g"     # must match your kube-prometheus-stack release
 ```
 
-The `release` label on each `ServiceMonitor` has to match the label your Prometheus operator selects on, or the
-targets are created and silently ignored.
+That `release` label has to match the label your Prometheus operator selects on, or the ServiceMonitors are
+created and silently ignored.
 
-### Subscriber provisioning
+### Subscribers
+
+`charts/subscribers` takes a list, each entry carrying its own slice, DNN and security material:
 
 ```yaml
-add_subs_auto:
-  helm_post_hook:
-    enabled: true
-    image:
-      repository: <registry>/mongo-tools
-      tag: "0.0.1"
+subscriber_info:
+  - imsi: "001010000000001"
+    slice:
+      sst: 1
+      sd: { enabled: false, sd_value: "" }
+    session:
+      dnn_name: internet
+      dnn_type: 3            # 1=IPv4, 2=IPv6, 3=IPv4/6
+      qos: { qci: 9 }
+    security:
+      key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+      opc: "E8ED289DEBA952E4283B54E88E6183CA"
+      amf: 8000
 ```
 
-When enabled, a post-install `Job` waits for the WebUI to return HTTP 200, then `mongoimport`s the subscriber
-list from the `mongodb-subs-cmap` ConfigMap. Edit that ConfigMap to change IMSIs, keys (`K`/`OPc`) and slice
-assignments. The hook image needs `curl` and `mongoimport` on its `PATH`.
+The default `key`/`opc` are the **well-known Open5GS/UERANSIM test vectors**. They are fine for a lab and must
+never be used anywhere real.
 
 ### Private registries
 
@@ -269,43 +345,48 @@ global_config:
     name: open5gs-project-secret
     image_secret_creator:
       enabled: false     # true renders the Secret from the values below
-    registry: <registry>
-    username: <user>
-    password: <password>
+    registry: ""
+    username: ""
+    password: ""
 ```
 
-> **Do not commit credentials.** Leave `image_secret_creator.enabled: false` and create the pull secret out of
-> band with `kubectl create secret docker-registry`, or pass the values with `--set` at install time.
+> **Do not commit credentials.** Leave `image_secret_creator.enabled: false` and create the pull secret with
+> `kubectl create secret docker-registry`, or pass values with `--set` at install time.
 
-## Verifying the deployment
+## Verifying
 
 ```bash
-kubectl get pods -n open5gs -o wide              # check UPF landed on the expected node
-kubectl logs -n open5gs deploy/amf-depl | grep -i "ngap"
-kubectl logs -n open5gs deploy/upf-depl -c tun-interface-create
-kubectl exec -n open5gs deploy/upf-depl -- ip addr show ogstun0
+kubectl get pods -n open5gs -o wide                      # did the UPF land on the expected node?
+kubectl logs  -n open5gs deploy/amf-depl | grep -i ngap  # gNB attached?
+kubectl logs  -n open5gs deploy/upf-depl -c tun-interface-create
+kubectl exec  -n open5gs deploy/upf-depl -- ip addr show ogstun0
+kubectl exec  -n open5gs deploy/ue-depl  -- ip addr show uesimtun0
 ```
 
-A healthy core shows every NF registered with the NRF, `ogstun0` up with the configured address, and the AMF
-listening on SCTP `38412`.
+A healthy testbed shows every NF registered with the NRF, `ogstun0` up on the UPF, `uesimtun0` up on the UE with
+an address from the SMF pool, and the AMF listening on SCTP `38412`.
 
 ## Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
 | UPF `CrashLoopBackOff`, init container exits 1 | `ogstun0` already exists on the host from a previous run, or the CNI blocks privileged pods |
-| gNB cannot reach the AMF | NGAP service needs SCTP end to end — check the CNI and any load balancer in front of it |
-| Sessions establish but no traffic flows | SMF and UPF `subnet_list` entries disagree, or the `MASQUERADE` rule did not install |
-| `ServiceMonitor` created but no targets | `global_config.monitoring.prometheus.release.name` does not match the Prometheus release label |
+| gNB cannot reach the AMF | NGAP needs SCTP end to end — check the CNI and anything in front of it; `gnb.amf.ip` must be a node IP, not a ClusterIP |
+| UE never gets `uesimtun0` | IMSI not provisioned, or the UE's S-NSSAI is not in the AMF and NSSF lists |
+| Sessions establish but no traffic flows | SMF and UPF `subnet_list` disagree, or the `MASQUERADE` rule did not install |
+| `ServiceMonitor` created but no targets | `monitoring.prometheus.release.name` mismatch, or an Open5GS image older than 2.5.9 |
 | Pods stay `Pending` | No node carries the `5g-node` label the chart selects on |
+| GTP-U service stuck `<pending>` | `loadBalancerIP` sits outside the MetalLB pool, or MetalLB is not installed |
 
 ## Known limitations
 
-- The UPF runs **privileged** with `NET_ADMIN`. That is inherent to creating TUN devices and installing iptables
-  rules from inside a pod; it is acceptable for a testbed and would need rework for a hardened cluster.
+- The UPF and the UERANSIM UE run **privileged** with `NET_ADMIN`. That is inherent to creating TUN devices and
+  installing iptables rules from inside a pod; acceptable for a testbed, and would need rework for a hardened
+  cluster.
 - No `values.schema.json`, so bad values fail at apply time rather than at lint time.
-- Deployments have no readiness or liveness probes; NF bring-up relies on NRF registration retries.
+- No readiness or liveness probes; NF bring-up relies on NRF registration retries.
 - Single-replica NFs — there is no HA story here.
+- The WebUI image pins an old Node.js base and tracks upstream `master` unpinned.
 
 ## Acknowledgements
 
@@ -313,12 +394,11 @@ listening on SCTP `38412`.
 the AGPL-3.0 license. [UERANSIM](https://github.com/aligungr/UERANSIM) is by Ali Güngör. This repository contains
 only the Kubernetes packaging, the edge-placement work, and the container build definitions around them.
 
-The chart was developed and validated on a private lab cluster. In that environment, multi-site lifecycle
+The charts were developed and validated on a private lab cluster. In that environment, multi-site lifecycle
 management was driven by a separate commercial orchestration platform; that integration layer is proprietary and
-deliberately out of scope here. Nothing in this repository depends on it — the chart installs with nothing but
-Helm.
+deliberately out of scope here. Nothing in this repository depends on it — everything installs with Helm alone.
 
 ## License
 
-[Apache License 2.0](LICENSE). Open5GS itself is distributed under the AGPL-3.0 license; this chart packages it
-but is not a derivative work of it.
+[Apache License 2.0](LICENSE). Open5GS and UERANSIM are distributed under their own licenses (AGPL-3.0 and
+GPL-3.0 respectively); this repository packages them but is not a derivative work of either.
