@@ -10,6 +10,29 @@ edge-computing research and testbeds. Unlike a flat single-cluster deployment, t
 Function as a relocatable component**: the UPF can be pinned to edge nodes while the control plane stays in the
 cloud, which is the topology that matters for low-latency MEC use cases.
 
+<p align="center">
+  <img src="docs/images/5g-core-on-kubernetes.gif"
+       alt="Animated walkthrough of a 5G core running on Kubernetes: AMF, NRF, SMF, PCF and UPF as Deployments, Pods, Services and ConfigMaps, with the N2, N3, N4 and N6 reference points drawn across them"
+       width="720">
+</p>
+<p align="center"><em>3GPP reference points mapped onto Kubernetes objects — control plane (red) and user plane (blue).</em></p>
+
+## Research context
+
+The testbed this chart was built for backs two peer-reviewed publications on network slice federation:
+
+> **[1]** M. Dalgitsis, N. Cadenelli, M. A. Serrano, N. Bartzoudis, L. Alonso, A. Antonopoulos,
+> "NSFaaS: Network Slice Federation as a Service in Cloud-Native 5G and Beyond Mobile Networks,"
+> *2023 IEEE Conference on Network Function Virtualization and Software Defined Networks (NFV-SDN)*,
+> pp. 59–64, 2023. [doi:10.1109/NFV-SDN59219.2023.10329748](https://doi.org/10.1109/NFV-SDN59219.2023.10329748)
+
+> **[2]** M. Dalgitsis, N. Cadenelli, M. A. Serrano, N. Bartzoudis, L. Alonso, A. Antonopoulos,
+> "Cloud-Native Orchestration Framework for Network Slice Federation Across Administrative Domains in 5G/6G
+> Mobile Networks," *IEEE Transactions on Vehicular Technology*, vol. 73, pp. 9306–9319, 2024.
+> [doi:10.1109/TVT.2024.3362583](https://doi.org/10.1109/TVT.2024.3362583)
+
+The S-NSSAI slicing support and the cloud/edge UPF split below are the mechanisms those papers measure.
+
 ## Why this chart
 
 Most Open5GS-on-Kubernetes charts deploy all network functions as interchangeable pods on whatever node the
@@ -107,17 +130,23 @@ the core and the deployment collapses into a single-site topology.
   kubectl label node <edge-node>  5g-node=edge-node   # only for distributed UPF
   ```
 
-### Container image
+### Container images
 
-This chart expects an Open5GS container image that bundles the `open5gs-*d` binaries under `/open5gs/install/bin`.
-There is no public image pinned by default — set `open5gs.image.repository` to your own registry. Build one from
-the [upstream Open5GS sources](https://github.com/open5gs/open5gs) and push it before installing:
+The chart does not pin a public image, but **this repository ships the Dockerfiles it expects** — see
+[`docker/`](docker/) for Open5GS 2.4.8 through 2.6.6, the WebUI, the subscriber-import tooling, and a UERANSIM
+UE/gNB simulator.
 
 ```bash
+docker build -t <registry>/open5gs:2.6.1 docker/open5gs/2.6.1
+docker push  <registry>/open5gs:2.6.1
+
 helm install open5gs ./open5gs-helm-chart \
   --set open5gs.image.repository=<registry>/open5gs \
   --set open5gs.image.tag=2.6.1
 ```
+
+> Open5GS builds **before 2.5.9** do not include the Prometheus metrics implementation. Use 2.5.9 or later if
+> you want the AMF/SMF metrics endpoints to return anything.
 
 ## Quick start
 
@@ -280,13 +309,14 @@ listening on SCTP `38412`.
 
 ## Acknowledgements
 
-This chart was developed in the context of applied research on edge-cloud 5G deployments. The Open5GS project
-itself is authored and maintained by [Sukchan Lee and contributors](https://github.com/open5gs/open5gs); this
-repository contains only the Kubernetes packaging and the edge-placement work around it.
+[Open5GS](https://github.com/open5gs/open5gs) is authored and maintained by Sukchan Lee and contributors, under
+the AGPL-3.0 license. [UERANSIM](https://github.com/aligungr/UERANSIM) is by Ali Güngör. This repository contains
+only the Kubernetes packaging, the edge-placement work, and the container build definitions around them.
 
-In the environments where it was validated, lifecycle management and multi-site orchestration were handled by a
-separate commercial orchestration platform. That integration layer is proprietary and deliberately out of scope
-here — this chart stands alone and installs with nothing but Helm.
+The chart was developed and validated on a private lab cluster. In that environment, multi-site lifecycle
+management was driven by a separate commercial orchestration platform; that integration layer is proprietary and
+deliberately out of scope here. Nothing in this repository depends on it — the chart installs with nothing but
+Helm.
 
 ## License
 
