@@ -9,6 +9,10 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chart: [open5gs, upf, ueransim, subscribers]
     steps:
       - uses: actions/checkout@v4
 
@@ -17,16 +21,48 @@ jobs:
         with:
           version: v3.14.0
 
-      - name: helm lint
-        run: helm lint open5gs-helm-chart
+      - name: helm lint ${{ matrix.chart }}
+        run: helm lint charts/${{ matrix.chart }}
 
-      - name: Render templates with default values
-        run: helm template open5gs open5gs-helm-chart > /dev/null
+      - name: Render ${{ matrix.chart }} with default values
+        run: helm template ci charts/${{ matrix.chart }} > /dev/null
 
-      - name: Render templates with distributed UPF enabled
+  render-conditionals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      # The optional templates are guarded by `if` blocks that default to off,
+      # so a plain render never exercises them.
+      - name: Core with distributed UPF, subscriber hook and pull-secret creator
         run: |
-          helm template open5gs open5gs-helm-chart \
+          helm template ci charts/open5gs \
             --set upf.distributed_upf.enabled=true \
             --set add_subs_auto.helm_post_hook.enabled=true \
+            --set global_config.imagePullSecret.image_secret_creator.enabled=true \
+            > /dev/null
+
+      - name: Standalone UPF with pull-secret creator
+        run: |
+          helm template ci charts/upf \
+            --set global_config.imagePullSecret.image_secret_creator.enabled=true \
+            > /dev/null
+
+      - name: UERANSIM with gNB and UE started and pull-secret creator
+        run: |
+          helm template ci charts/ueransim \
+            --set gnb.start_gnb.enabled=true \
+            --set ue.start_ue.enabled=true \
+            --set ueransim.imagePullSecret.image_secret_creator.enabled=true \
+            > /dev/null
+
+      - name: Subscribers with pull-secret creator
+        run: |
+          helm template ci charts/subscribers \
             --set global_config.imagePullSecret.image_secret_creator.enabled=true \
             > /dev/null
