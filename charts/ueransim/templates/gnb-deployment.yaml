@@ -1,0 +1,49 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: ueransim-gnb-depl
+  labels:
+    ueransim-type: gnb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      ueransim-type: gnb
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/gnb-configmap.yaml") . | sha256sum }}
+      labels:
+        ueransim-type: gnb
+    spec:    
+      containers:
+        - name: ueransim-gnb
+          image: "{{ .Values.ueransim.image.repository }}:{{ .Values.ueransim.image.tag }}"
+          imagePullPolicy: {{ .Values.ueransim.image.pullPolicy }}
+          {{- if .Values.gnb.start_gnb.enabled }}
+          command: ["/bin/sh"]
+          args: ["-c", "sleep 5; ./nr-gnb -c config/open5gs-gnb.yaml"]
+          {{- end }}
+          ports:
+          - name: gnb-ue
+            containerPort: 4997
+            protocol: UDP
+          - name: gnb-upf
+            containerPort: 2152
+            protocol: UDP
+          volumeMounts:
+          - name: gnb-cmap
+            mountPath: /ueransim/config/open5gs-gnb.yaml
+            subPath: "open5gs-gnb.yaml"
+      {{- if .Values.ueransim.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: "{{ .Values.ueransim.imagePullSecret.name }}"
+      {{- end }}
+      volumes:
+        - name: gnb-cmap
+          configMap:
+            name: gnb-cmap
+      {{- if .Values.node_labels.enabled }}
+      nodeSelector:
+        {{- .Values.node_labels.node_selector | toYaml | nindent 8 }}
+      {{- end }}

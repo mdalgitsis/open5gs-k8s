@@ -1,0 +1,9 @@
+apiVersion: v2
+name: ueransim
+description: A Helm chart for ueransim (gNodeB and UE) a 5G RAN simulator
+icon: https://github.com/aligungr/UERANSIM/raw/master/.github/logo.png
+sources:
+  - https://github.com/aligungr/UERANSIM
+type: application
+version: 0.1.0
+appVersion: 3.2.6

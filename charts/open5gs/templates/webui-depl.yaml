@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: open5gs-webui
+  labels:
+    nf-type: webui
+spec:
+  type: {{ .Values.webui.service.type }}  
+  ports:
+    - port: {{ .Values.webui.service.port }}  
+      targetPort: {{ .Values.webui.service.target_port }}  
+      nodePort: {{ .Values.webui.service.node_port }}   # Node port
+  selector:
+    nf-type: webui
+
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: open5gs-webui 
+  labels:
+    nf-type: webui
+spec:
+  replicas: {{ .Values.webui.replicas }}  
+  selector:
+    matchLabels:
+      nf-type: webui
+  template:
+    metadata:
+      labels:
+        nf-type: webui
+    spec:    
+      containers:
+      - name: webui
+        imagePullPolicy: {{ .Values.webui.image.pullPolicy }}
+        image: "{{ .Values.webui.image.repository }}:{{ .Values.webui.image.tag }}"      
+        command: ["/bin/sh", "-c"]
+        args:
+         - sleep 30;
+           npm run dev
+        env:
+        - name: DB_URI
+          value: "{{ .Values.global_config.db_uri }}"  
+      nodeSelector:
+        {{- .Values.webui.node_selector | toYaml | nindent 8 }}
+      {{- if .Values.global_config.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: "{{ .Values.global_config.imagePullSecret.name }}"
+      {{- end }}

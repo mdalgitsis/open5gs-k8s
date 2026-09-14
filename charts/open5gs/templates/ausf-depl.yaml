@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ausf-svc
+  labels:
+    nf-type: ausf
+spec:
+  selector:
+    nf-type: ausf
+  ports:
+    - name: sbi
+      protocol: TCP
+      port: {{ .Values.ausf.service.sbi.port }}   
+      targetPort: {{ .Values.amf.service.sbi.target_port }} 
+---  
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: ausf-depl
+  labels:
+    nf-type: ausf
+spec:
+  replicas: {{ .Values.ausf.replicas }}
+  selector:
+    matchLabels:
+      nf-type: ausf
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/ausf-cmap.yaml") . | sha256sum }}
+      labels:
+        nf-type: ausf
+    spec:    
+      containers:
+        - name: ausf
+          image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+          imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+          command: ["/bin/sh"]
+          args: ["-c", "/open5gs/install/bin/open5gs-ausfd -c /open5gs/config-map/ausf.yaml"]
+          ports:
+            - name: sbi
+              containerPort: {{ .Values.ausf.container_port.sbi }}
+          volumeMounts:
+          - name: ausf-cmap
+            mountPath: /open5gs/config-map/ausf.yaml
+            subPath: "ausf.yaml"
+      {{- if .Values.global_config.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: "{{ .Values.global_config.imagePullSecret.name }}"
+      {{- end }}
+      volumes:
+        - name: ausf-cmap
+          configMap:
+            name: ausf-cmap
+      nodeSelector:
+        {{- .Values.ausf.node_selector | toYaml | nindent 8 }}

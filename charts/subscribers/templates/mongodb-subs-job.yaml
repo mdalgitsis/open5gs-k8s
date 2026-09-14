@@ -1,0 +1,51 @@
+apiVersion: batch/v1 
+kind: Job 
+metadata:   
+  name: add-subs-job   
+  labels:     
+    app: open5gs-mongodb-subs
+spec:   
+  template:     
+    metadata:            
+      labels:         
+        app: open5gs-mongodb-subs  
+    spec:       
+      restartPolicy: OnFailure
+      containers:       
+      - name: add-subs         
+        image: "{{ .Values.add_subscribers.image.repository }}:{{ .Values.add_subscribers.image.tag }}"         
+        command: ["/bin/sh", "-c"]
+        args: 
+          - |
+            while : 
+            do 
+              status="$(curl -s -o /dev/null -w "%{http_code}" http://open5gs-webui:3000)"
+              echo $status
+              echo "trying to check connection with open5gs-webui"
+              if [ "$status" = "200" ]
+              then
+                echo "open5gs-webui is responsive"
+                sleep 1
+                break
+              else
+                echo "open5gs-webui is not responsive"
+              fi
+            done
+              printf '\n'
+            mongoimport --uri 'mongodb://mongodb-svc:27017' --db open5gs --collection subscribers --file /subscribers/subs_5g.json --type json --jsonArray    
+        volumeMounts:
+        - name: mongodb-subs-cmap
+          mountPath: /subscribers/subs_5g.json
+          subPath: "subs_5g.json"
+      {{- if .Values.global_config.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: "{{ .Values.global_config.imagePullSecret.name }}"
+      {{- end }}
+      volumes:
+      - name: mongodb-subs-cmap
+        configMap: 
+          name: mongodb-subs-cmap
+      {{- if .Values.add_subscribers.node.enabled }}
+      nodeSelector:
+        {{- .Values.add_subscribers.node.node_selector | toYaml | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,99 @@
+{{- if .Values.amf.configuration.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    nf-type: amf
+  name: amf-metrics
+spec:
+  selector:
+    nf-type: amf
+  ports:
+  - name: metrics
+    protocol: TCP 
+    port: {{ .Values.amf.service.metrics.port }} 
+    targetPort: {{ .Values.amf.service.metrics.target_port }}
+  type: ClusterIP
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: amf-sbi-svc
+  labels:
+    nf-type: amf
+spec:
+  selector:
+    nf-type: amf
+  ports:
+    - name: sbi
+      protocol: TCP
+      port: {{ .Values.amf.service.sbi.port }}   
+      targetPort: {{ .Values.amf.service.sbi.target_port }} 
+  type: ClusterIP     
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    nf-type: amf
+  name: amf-ngap-svc
+spec:
+  type: {{ .Values.amf.service.ngap.type }} 
+  selector:
+    nf-type: amf
+  ports:
+    - name: ngap 
+      protocol: SCTP
+      port: {{ .Values.amf.service.ngap.port }}  # Service port
+      targetPort: {{ .Values.amf.service.ngap.target_port }} # Pod port
+      nodePort: {{ .Values.amf.service.ngap.node_port }} 
+
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: amf-depl
+  labels:
+    nf-type: amf
+spec:
+  replicas: {{ .Values.amf.replicas }}
+  selector:
+    matchLabels:
+      nf-type: amf
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/amf-cmap.yaml") . | sha256sum }}
+      labels:
+        nf-type: amf
+    spec:    
+      containers:
+        - name: amf
+          image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+          imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+          command: ["/bin/sh"]
+          args: ["-c", "/open5gs/install/bin/open5gs-amfd -c /open5gs/config-map/amf.yaml"]
+          ports:
+            - name: sbi
+              containerPort: {{ .Values.amf.container_port.sbi }}
+            - name: ngap
+              containerPort: {{ .Values.amf.container_port.ngap }}
+              protocol: SCTP
+            - name: metrics
+              containerPort: {{ .Values.amf.container_port.metrics }}
+          volumeMounts:
+          - name: amf-cmap
+            mountPath: /open5gs/config-map/amf.yaml
+            subPath: "amf.yaml"
+      {{- if .Values.global_config.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: "{{ .Values.global_config.imagePullSecret.name }}"
+      {{- end }}
+      volumes:
+        - name: amf-cmap
+          configMap:
+            name: amf-cmap
+      nodeSelector:
+        {{- .Values.amf.node_selector | toYaml | nindent 8 }}

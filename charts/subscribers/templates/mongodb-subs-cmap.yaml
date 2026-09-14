@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-subs-cmap
+  labels:
+    app: open5gs-mongodb
+data:
+  subs_5g.json: |  
+    [
+     {{- $last := sub (len .Values.subscriber_info) 1 }}
+     {{- range $index, $list := .Values.subscriber_info }}
+     { "imsi" : "{{ .imsi }}", "subscribed_rau_tau_timer" : 12, "network_access_mode" : 0, "subscriber_status" : 0, "access_restriction_data" : 32, "slice" : [ { "sst" : {{ .slice.sst }}, {{- if .slice.sd.enabled }} "sd" : "{{ .slice.sd.sd_value }}",{{- end }} "default_indicator" : true, "session" : [ { "name" : "{{ .session.dnn_name }}", "type" : {{ .session.dnn_type }}, "pcc_rule" : [ ], "ambr" : { "uplink" : { "value" : 1, "unit" : 3 }, "downlink" : { "value" : 1, "unit" : 3 } }, "qos" : { "index" : {{ .session.qos.qci }}, "arp" : { "priority_level" : 8, "pre_emption_capability" : 1, "pre_emption_vulnerability" : 1 } } } ] } ], "ambr" : { "uplink" : { "value" : 1, "unit" : 3 }, "downlink" : { "value" : 1, "unit" : 3 } }, "security" : { "k" : "{{ .security.key }}", "amf" : "{{ .security.amf }}", "op" : null, "opc" : "{{ .security.opc }}" }, "imeisv" : [{{ .security.imeisv }}], "msisdn" : [{{ .security.msisdn }}], "schema_version" : 1, "__v" : 0 }{{ if ne $index $last }},{{ end }}
+     {{- end }}
+    ]

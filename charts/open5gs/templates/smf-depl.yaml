@@ -1,0 +1,97 @@
+{{- if .Values.smf.configuration.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    nf-type: smf
+  name: smf-metrics
+spec:
+  selector:
+    nf-type: smf
+  ports:
+  - name: metrics
+    protocol: TCP 
+    port: {{ .Values.smf.service.metrics.port }} 
+    targetPort: {{ .Values.smf.service.metrics.target_port }}
+  type: ClusterIP
+{{- end }}
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: smf-sbi-svc
+  labels:
+    nf-type: smf
+spec:
+  selector:
+    nf-type: smf
+  ports:
+    - name: sbi
+      protocol: TCP
+      port: {{ .Values.amf.service.sbi.port }}  
+      targetPort: {{ .Values.smf.service.sbi.target_port }}  
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: smf-pfcp-svc
+  labels:
+    nf-type: smf
+spec:
+  selector:
+    nf-type: smf
+  ports:
+    - name: pfcp
+      protocol: UDP
+      port: {{ .Values.smf.service.pfcp.port }}
+      targetPort: {{ .Values.smf.service.pfcp.target_port }}
+
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: smf-depl
+  labels:
+    nf-type: smf
+spec:
+  replicas: {{ .Values.smf.replicas }}
+  selector:
+    matchLabels:
+      nf-type: smf
+  template:
+    metadata:       
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/smf-cmap.yaml") . | sha256sum }}
+      labels:
+        nf-type: smf
+    spec:   
+      containers:
+      - name: smf
+        image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+        imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+        command: ["/bin/sh"]
+        args: ["-c", "/open5gs/install/bin/open5gs-smfd -c /open5gs/config-map/smf.yaml"]
+        ports:
+          - name: sbi
+            containerPort: {{ .Values.smf.container_port.sbi }}
+          - name: pfcp
+            containerPort: {{ .Values.smf.container_port.pfcp }}
+            protocol: UDP
+          - name: metrics
+            containerPort: {{ .Values.smf.container_port.metrics }}
+        volumeMounts:
+          - name: smf-cmap
+            mountPath: /open5gs/config-map/smf.yaml
+            subPath: "smf.yaml"                                       
+      {{- if .Values.global_config.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: "{{ .Values.global_config.imagePullSecret.name }}"
+      {{- end }}
+      volumes:
+        - name: smf-cmap
+          configMap:
+            name: smf-cmap 
+      nodeSelector:
+        {{- .Values.smf.node_selector | toYaml | nindent 8 }}

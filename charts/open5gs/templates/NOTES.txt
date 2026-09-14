@@ -1,0 +1,24 @@
+Open5GS 5G core "{{ .Release.Name }}" has been installed into namespace {{ .Release.Namespace }}.
+
+Watch the network functions come up:
+
+  kubectl get pods -n {{ .Release.Namespace }} -o wide -w
+
+{{ if .Values.upf.distributed_upf.enabled -}}
+Distributed UPF is ENABLED. Confirm the UPF landed on an edge node:
+
+  kubectl get pod -n {{ .Release.Namespace }} -l nf-type=upf -o wide
+{{- else -}}
+Distributed UPF is disabled: the UPF runs alongside the control plane.
+{{- end }}
+
+Check the UPF tunnel devices were created:
+
+  kubectl logs -n {{ .Release.Namespace }} -l nf-type=upf -c tun-interface-create
+
+Reach the subscriber WebUI (default credentials are admin / 1423):
+
+  http://<node-ip>:{{ .Values.webui.service.node_port }}
+
+N2 (NGAP/SCTP) for your gNB:      port {{ .Values.amf.service.ngap.node_port }}
+N3 (GTP-U/UDP) for your gNB:      {{ if .Values.upf.service.nodeport.enabled }}NodePort {{ .Values.upf.service.gtpu.node_port }}{{ else }}LoadBalancer {{ .Values.upf.service.loadbalancer.loadBalancerIP | default "<pending - set upf.service.loadbalancer.loadBalancerIP>" }}{{ end }}

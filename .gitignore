@@ -1,6 +1,8 @@
-# Helm
+# Helm packaging artefacts and vendored subcharts.
+# Scoped to *inside* a chart - the repository's own charts live in charts/
+# and must stay tracked.
 *.tgz
-charts/
+charts/*/charts/
 .helmignore.bak
 
 # Rendered / local overrides

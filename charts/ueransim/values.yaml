@@ -1,0 +1,79 @@
+# Default values for ueransim-helm chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+ueransim:
+  image:
+    repository: ""   # e.g. ghcr.io/<you>/ueransim - build from docker/ueransim
+    tag: "3.2.6"
+    pullPolicy: IfNotPresent
+  imagePullSecret:
+    enabled: True
+    name: open5gs-project-secret
+    # Prefer creating this Secret out of band:
+    #   kubectl create secret docker-registry <name> ...
+    # Only fill these in if image_secret_creator.enabled is true, and never commit real values.
+    registry: ""
+    username: ""
+    password: ""
+    image_secret_creator:
+      enabled: False
+
+
+# general configuration
+plmn:
+  # Mobile Country Code value of HPLMN
+  mcc: '001'
+  # Mobile Network Code value of HPLMN (2 or 3 digits)
+  mnc: '01'
+  # Tracking Area Code
+  tac: '7'
+slices:
+  - sst: 1
+#    sd: "0x111111"
+node_labels:
+  enabled: True
+  node_selector: 
+    5g-node: "edge-node"
+
+
+# gNB configuration
+gnb: 
+  amf:                   # configure with AMF server IP
+    ip: ""               # node IP exposing the AMF NGAP NodePort (kubectl get nodes -o wide)
+    port: 38412
+  interfaces:
+    n2:
+      ip: ueransim-gnb-svc # gNB's local IP address for N2 Interface (Usually same with local IP) or Kubernetes Service Name
+    n3:
+      ip: ueransim-gnb-svc # gNB's local IP address for N3 Interface (Usually same with local IP) or Kubernetes Service Name
+    radio:
+      ip: ueransim-gnb-svc # gNB's local IP address for Radio Link Simulation (Usually same with local IP) or Kubernetes Service Name
+  start_gnb: 
+    enabled: False
+      
+  
+
+
+# UE configuration
+ue:
+  # IMSI number of the UE. IMSI = [MCC|MNC|MSISDN] (In total 15 digits)
+  initialMSISDN: '0000000001'
+  # Permanent subscription key
+  key: 465B5CE8B199B49FAA5F0A2EE238A6BC
+  # Operator code (OP or OPC) of the UE
+  op: E8ED289DEBA952E4283B54E88E6183CA
+  # This value specifies the OP type and it can be either 'OP' or 'OPC'
+  opType: OPC
+  apnList:
+    - type: 'IPv4'
+      apn: 'internet'
+      slice:
+        sst: 1
+#        sd: "0x111111"
+  # List of gNB IP addresses for Radio Link Simulation, configure with server2 IP or  gNB Kubernetes Service Name
+  gnb:
+    ip: ueransim-gnb-svc
+  start_ue: 
+      enabled: False
+        

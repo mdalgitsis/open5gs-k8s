@@ -1,0 +1,50 @@
+# Default values for open5gs-epc-helm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+
+# General configuration
+global_config:
+  db_uri: mongodb://mongodb-svc:27017/open5gs
+  imagePullSecret:
+    enabled: True
+    name: open5gs-project-secret
+    # Prefer creating this Secret out of band:
+    #   kubectl create secret docker-registry <name> ...
+    # Only fill these in if image_secret_creator.enabled is true, and never commit real values.
+    registry: ""
+    username: ""
+    password: ""
+    image_secret_creator: 
+      enabled: False
+
+# ADD Subscribers 
+add_subscribers:
+  image:
+    repository: ""   # e.g. ghcr.io/<you>/open5gs-subscribers - build from docker/subscribers
+    tag: "0.0.1"  
+    pullPolicy: IfNotPresent
+  node:
+    enabled: False
+    node_selector: 
+      5g-node: "cloud-node"
+
+# Subscribers info
+subscriber_info:
+  - imsi: "001010000000001"
+    slice:
+      sst: 1
+      sd:
+       enabled: False
+       sd_value: "" # value in hexadecimal, e.g. "0f0542" and must be 6 digits
+    session:
+      dnn_name: internet
+      dnn_type: 3 # 1 for ipv4, 2 for ipv6, 3 for ipv4/6
+      qos:
+        qci: 9
+    security:
+      key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+      amf: 8000
+      opc: "E8ED289DEBA952E4283B54E88E6183CA"
+      imeisv: null
+      msisdn: null

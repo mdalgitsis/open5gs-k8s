@@ -1,0 +1,68 @@
+# Default values for open5gs-epc-helm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# open5gs-UPF
+open5gs:
+  image:
+    repository: ""   # e.g. ghcr.io/<you>/open5gs - build from docker/open5gs
+    tag: "2.6.1"
+    pullPolicy: IfNotPresent
+
+# UPF Deployment, Service and ConfigMap
+upf:
+  service:
+    gtpu: 
+      name: "upf-gtpu-svc-2"
+      port: 2152
+      target_port: 2152
+      node_port: 2152
+    pfcp:
+      name: "upf-pfcp-svc-2"
+      port: 8805
+      target_port: 8805
+    nodeport:
+      enabled: False
+      type: NodePort
+    loadbalancer:
+      enabled: True
+      type: LoadBalancer
+      loadBalancerIP: ""           # an address inside your MetalLB pool
+  replicas: 1
+  container_port:
+    gtpu: 2152
+    pfcp: 8805
+  # if distributed_upf is enabled then the UPF will be located in the edge
+  distributed_upf: 
+    enabled: False
+    node_selector: 
+      5g-node: "edge-node"
+  configuration:
+    subnet_list:
+      - addr: 10.46.0.1/16
+        dnn: internet2
+        dev: ogstun2
+    pfcp_smf_connection_list:
+       - name: smf-pfcp-svc # service k8s name of the SMF. If SMF is not on the same cluster as UPF, SMF must be exposed as NodePort
+         port: 8805
+
+# General configuration
+global_config:
+  sbi:
+    advertise: True
+  host:
+    interface: eth0
+  imagePullSecret:
+    enabled: True
+    name: upf-secret
+    # Prefer creating this Secret out of band:
+    #   kubectl create secret docker-registry <name> ...
+    # Only fill these in if image_secret_creator.enabled is true, and never commit real values.
+    registry: ""
+    username: ""
+    password: ""
+    image_secret_creator:
+      enabled: False
+  logs:
+    enabled: False
+    log_level: debug

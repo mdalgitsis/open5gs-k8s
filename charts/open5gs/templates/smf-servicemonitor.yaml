@@ -1,0 +1,17 @@
+{{- if .Values.smf.configuration.metrics.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: smf-servicemonitor
+  labels:
+    nf-type: smf
+    release: {{ .Values.global_config.monitoring.prometheus.release.name }}
+spec:
+  selector:
+    matchLabels:
+      nf-type: smf
+  endpoints:
+  - port: metrics
+    interval: {{ .Values.smf.configuration.metrics.interval }}
+{{- end }}
+     

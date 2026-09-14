@@ -1,0 +1,16 @@
+Subscriber import job "{{ .Release.Name }}" has been created in namespace {{ .Release.Namespace }}.
+
+Watch the job complete:
+
+  kubectl get job -n {{ .Release.Namespace }} -w
+  kubectl logs -n {{ .Release.Namespace }} job/add-subs-job
+
+{{ len .Values.subscriber_info }} subscriber(s) will be imported into {{ .Values.global_config.db_uri }}:
+{{- range .Values.subscriber_info }}
+  - IMSI {{ .imsi }} on DNN {{ .session.dnn_name }} (SST {{ .slice.sst }})
+{{- end }}
+
+Verify them in the Open5GS WebUI, or directly:
+
+  kubectl exec -n {{ .Release.Namespace }} deploy/open5gs-mongodb -- \
+    mongosh open5gs --quiet --eval 'db.subscribers.find({}, {imsi:1})'
