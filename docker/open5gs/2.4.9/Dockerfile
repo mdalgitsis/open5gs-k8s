@@ -1,0 +1,61 @@
+ARG UBUNTU_VERSION=20.04
+
+FROM ubuntu:${UBUNTU_VERSION} 
+
+ARG OPEN5GS_REPO=https://github.com/open5gs/open5gs
+ARG OPEN5GS_TAG=v2.4.9
+
+WORKDIR /
+
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y --no-install-recommends \
+        python3-pip \
+        python3-setuptools \
+        python3-wheel \
+        ninja-build \
+        build-essential \
+        flex \
+        bison \
+        git \
+        cmake \
+        meson \
+        libsctp-dev \
+        libgnutls28-dev \
+        libgcrypt-dev \
+        libssl-dev \
+        libidn11-dev \
+        libmongoc-dev \
+        libbson-dev \
+        libyaml-dev \
+        libmicrohttpd-dev \
+        libcurl4-gnutls-dev \
+        libnghttp2-dev \
+        libtins-dev \
+        libtalloc-dev \
+        iproute2 \
+        ca-certificates \
+        netbase \
+        iptables \
+	  ufw \
+        curl \
+        gnupg \
+        tshark \
+        iputils-ping \ 
+        tcpdump \
+        net-tools \
+        vim \
+        less \
+        pkg-config && \
+    apt-get clean
+
+RUN git clone $OPEN5GS_REPO \
+    && cd open5gs \
+    && git checkout $OPEN5GS_TAG \
+    && meson build --prefix=`pwd`/install \
+    && ninja -C build \
+    && cd build \
+    && ninja install
+
+CMD ["sh", "-c", "tail -f /dev/null"]
