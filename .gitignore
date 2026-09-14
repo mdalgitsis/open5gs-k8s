@@ -1,0 +1,15 @@
+# Helm
+*.tgz
+charts/
+.helmignore.bak
+
+# Rendered / local overrides
+values.local.yaml
+values.*.local.yaml
+rendered/
+
+# Editors & OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
