@@ -5,14 +5,14 @@
 # open5gs
 open5gs:
   image:
-    repository: your_repository/open5gs
+    repository: ""   # e.g. ghcr.io/<you>/open5gs - see README
     tag: "2.6.1"
     pullPolicy: IfNotPresent
 
 # Open5gs webui
 webui:
   image:
-    repository: your_repository/open5gs-webui
+    repository: ""   # e.g. ghcr.io/<you>/open5gs-webui
     tag: "latest"
     pullPolicy: IfNotPresent
   service:
@@ -230,7 +230,7 @@ upf:
     loadbalancer:
       enabled: True
       type: LoadBalancer
-      loadBalancerIP: xxx.xxx.xxx.xxx  # metalLB pool range: 10.201.0.11-12
+      loadBalancerIP: ""              # set to an address inside your MetalLB pool
   replicas: 1
   container_port:
     gtpu: 2152
@@ -266,9 +266,12 @@ global_config:
   imagePullSecret:
     enabled: True
     name: open5gs-project-secret
-    registry: your_repository
-    username: your_username
-    password: your_password
+    # Prefer creating this Secret out of band:
+    #   kubectl create secret docker-registry open5gs-project-secret ...
+    # Only fill these in if image_secret_creator.enabled is true, and never commit real values.
+    registry: ""
+    username: ""
+    password: ""
     image_secret_creator:
       enabled: False
     # log level can be set with none, fatal, error, warn, info, debug, trace
@@ -292,5 +295,5 @@ add_subs_auto:
     weight: "1"
     delete_policy: before-hook-creation
     image:
-      repository: your_repository
+      repository: ""   # image with curl + mongoimport on PATH
       tag: "0.0.1"  
