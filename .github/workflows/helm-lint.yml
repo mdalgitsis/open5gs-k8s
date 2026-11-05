@@ -66,3 +66,22 @@ jobs:
           helm template ci charts/subscribers \
             --set global_config.imagePullSecret.image_secret_creator.enabled=true \
             > /dev/null
+
+      # The public-image path: other binary directories, no WebUI, the AMF NGAP as a
+      # ClusterIP (no nodePort rendered), and the subscriber import gated on MongoDB with a
+      # PCC rule.
+      - name: Public images, no WebUI, subscribers waiting on MongoDB with a PCC rule
+        run: |
+          helm template ci charts/open5gs \
+            --set open5gs.binPath=/opt/open5gs/bin \
+            --set webui.enabled=false \
+            --set amf.service.ngap.type=ClusterIP \
+            > /dev/null
+          helm template ci charts/upf --set open5gs.binPath=/opt/open5gs/bin > /dev/null
+          helm template ci charts/ueransim \
+            --set ueransim.binPath=/usr/local/bin \
+            --set gnb.start_gnb.enabled=true \
+            --set ue.start_ue.enabled=true \
+            > /dev/null
+          helm template ci charts/subscribers \
+            -f charts/subscribers/ci/public-images-values.yaml > /dev/null

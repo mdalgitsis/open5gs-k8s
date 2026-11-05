@@ -168,6 +168,18 @@ docker push  <registry>/ueransim:3.2.6
 > Open5GS builds **before 2.5.9** omit the Prometheus metrics implementation. Use 2.5.9 or later or the
 > ServiceMonitors will be created and scrape nothing.
 
+**Public images instead.** The charts also run on the public `gradiant/open5gs` and `gradiant/ueransim` images.
+Those images install the binaries in a different directory from the ones built here, so tell the chart where
+they are:
+
+| Chart | Value | Default (images from `docker/`) | Public image |
+|---|---|---|---|
+| `open5gs`, `upf` | `open5gs.binPath` | `/open5gs/install/bin` | `/opt/open5gs/bin` (`gradiant/open5gs`) |
+| `ueransim` | `ueransim.binPath` | `.` (run from `/ueransim`) | `/usr/local/bin` (`gradiant/ueransim`) |
+
+`webui.enabled: false` in the core chart skips the WebUI. In that case, set the subscribers chart to wait for
+MongoDB instead (`add_subscribers.wait_for: mongodb`, below).
+
 ## End-to-end bring-up
 
 ```bash
@@ -336,6 +348,29 @@ subscriber_info:
 The default `key`/`opc` are the **well-known Open5GS/UERANSIM test vectors**. They are fine for a lab and must
 never be used anywhere real.
 
+| Value | Default | Description |
+|---|---|---|
+| `global_config.mongodb_host` | `mongodb-svc` | MongoDB Service to import into: `mongodb-svc` for `charts/open5gs`, `<release>-mongodb` for the Gradiant chart |
+| `add_subscribers.wait_for` | `webui` | Gate before the import: `webui` (needs `curl` in the image) or `mongodb` (needs `mongosh` or `mongo`, for example the stock `mongo` image) |
+| `subscriber_info[].session.pcc_rule` | `[]` | PCC rules on the DNN, in the Open5GS subscriber schema |
+
+The import **upserts by IMSI**, so you can re-run the job to change a subscriber; it does not add a duplicate.
+
+**PCC rules matter for QoS from outside the core.** The Open5GS PCF accepts an N5 app-session (what a NEF
+sends for AsSessionWithQoS) only if the subscriber's DNN already has a PCC rule with the 5QI that the media type
+maps to: AUDIO maps to 1, VIDEO to 2, CONTROL to 5. Otherwise the PCF returns `403` "No PCC Rule in DB".
+
+```yaml
+    session:
+      pcc_rule:
+        - qos:
+            index: 2                       # 5QI
+            arp: {priority_level: 4, pre_emption_capability: 1, pre_emption_vulnerability: 1}
+            mbr: {downlink: {value: 10, unit: 2}, uplink: {value: 10, unit: 2}}   # unit 2 = Mbps
+            gbr: {downlink: {value: 5,  unit: 2}, uplink: {value: 5,  unit: 2}}
+          flow: []
+```
+
 ### Private registries
 
 ```yaml
@@ -376,6 +411,8 @@ an address from the SMF pool, and the AMF listening on SCTP `38412`.
 | Sessions establish but no traffic flows | SMF and UPF `subnet_list` disagree, or the `MASQUERADE` rule did not install |
 | `ServiceMonitor` created but no targets | `monitoring.prometheus.release.name` mismatch, or an Open5GS image older than 2.5.9 |
 | Pods stay `Pending` | No node carries the `5g-node` label the chart selects on |
+| NF or gNB/UE containers exit at once on a public image, the log says the binary is `not found` | `open5gs.binPath` / `ueransim.binPath` not set for that image |
+| NEF / AF QoS request returns `403 No PCC Rule in DB` | The subscriber has no `pcc_rule` with the 5QI the media type maps to |
 | GTP-U service stuck `<pending>` | `loadBalancerIP` sits outside the MetalLB pool, or MetalLB is not installed |
 
 ## Known limitations

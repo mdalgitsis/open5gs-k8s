@@ -1,0 +1,38 @@
+# CI render: the public-image path. The import waits on MongoDB itself (no WebUI), targets
+# the Gradiant chart's MongoDB Service, and the subscriber carries a PCC rule for 5QI 2.
+global_config:
+  mongodb_host: core-mongodb
+  imagePullSecret:
+    enabled: false
+
+add_subscribers:
+  image:
+    repository: mongo
+    tag: "4.4"
+  wait_for: mongodb
+
+subscriber_info:
+  - imsi: "001010000000001"
+    slice:
+      sst: 1
+      sd:
+        enabled: false
+        sd_value: ""
+    session:
+      dnn_name: internet
+      dnn_type: 3
+      qos:
+        qci: 9
+      pcc_rule:
+        - qos:
+            index: 2
+            arp: {priority_level: 4, pre_emption_capability: 1, pre_emption_vulnerability: 1}
+            mbr: {downlink: {value: 10, unit: 2}, uplink: {value: 10, unit: 2}}
+            gbr: {downlink: {value: 5, unit: 2}, uplink: {value: 5, unit: 2}}
+          flow: []
+    security:
+      key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+      amf: 8000
+      opc: "E8ED289DEBA952E4283B54E88E6183CA"
+      imeisv: null
+      msisdn: null
