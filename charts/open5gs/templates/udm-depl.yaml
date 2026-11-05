@@ -36,7 +36,7 @@ spec:
           image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
           imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
           command: ["/bin/sh"]
-          args: ["-c", "/open5gs/install/bin/open5gs-udmd -c /open5gs/config-map/udm.yaml"]
+          args: ["-c", "{{ .Values.open5gs.binPath }}/open5gs-udmd -c /open5gs/config-map/udm.yaml"]
           ports: 
             - name: sbi
               containerPort: {{ .Values.udm.container_port.sbi }}

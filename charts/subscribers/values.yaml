@@ -6,6 +6,9 @@
 # General configuration
 global_config:
   db_uri: mongodb://mongodb-svc:27017/open5gs
+  # MongoDB Service the import job talks to (mongodb-svc for charts/open5gs; <release>-mongodb
+  # for the Gradiant open5gs chart).
+  mongodb_host: mongodb-svc
   imagePullSecret:
     enabled: True
     name: open5gs-project-secret
@@ -24,6 +27,9 @@ add_subscribers:
     repository: ""   # e.g. ghcr.io/<you>/open5gs-subscribers - build from docker/subscribers
     tag: "0.0.1"  
     pullPolicy: IfNotPresent
+  # What the import job waits for before running mongoimport: "webui" (the default, needs curl
+  # in the image) or "mongodb" (needs the mongo shell, e.g. the mongo:4.4 image, no webui needed).
+  wait_for: webui
   node:
     enabled: False
     node_selector: 

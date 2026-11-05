@@ -26,7 +26,7 @@ spec:
               add: ["NET_ADMIN"]
           {{- if .Values.ue.start_ue.enabled }}
           command: ["/bin/sh"]
-          args: ["-c", "./nr-ue -c config/open5gs-ue.yaml"]
+          args: ["-c", "cd /ueransim && {{ .Values.ueransim.binPath }}/nr-ue -c config/open5gs-ue.yaml"]
           {{- end }}
           volumeMounts:
           - name: ue-cmap

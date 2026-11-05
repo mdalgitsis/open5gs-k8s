@@ -8,9 +8,13 @@ open5gs:
     repository: ""   # e.g. ghcr.io/<you>/open5gs - see README
     tag: "2.6.1"
     pullPolicy: IfNotPresent
+  # Directory holding the open5gs-*d binaries. /open5gs/install/bin for the images built
+  # from docker/open5gs; /opt/open5gs/bin for the public gradiant/open5gs images.
+  binPath: /open5gs/install/bin
 
 # Open5gs webui
 webui:
+  enabled: true
   image:
     repository: ""   # e.g. ghcr.io/<you>/open5gs-webui
     tag: "latest"

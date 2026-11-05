@@ -84,7 +84,7 @@ spec: # desired state of deployment
             capabilities:
               add: ["NET_ADMIN"]
           command: ["/bin/sh"]
-          args: ["-c", "/open5gs/install/bin/open5gs-upfd -c /open5gs/config-map/upf.yaml"]
+          args: ["-c", "{{ .Values.open5gs.binPath }}/open5gs-upfd -c /open5gs/config-map/upf.yaml"]
           ports:
             - name: pfcp
               containerPort: {{ .Values.upf.container_port.pfcp }}

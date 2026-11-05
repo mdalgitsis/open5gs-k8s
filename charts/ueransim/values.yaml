@@ -7,6 +7,9 @@ ueransim:
     repository: ""   # e.g. ghcr.io/<you>/ueransim - build from docker/ueransim
     tag: "3.2.6"
     pullPolicy: IfNotPresent
+  # Directory holding nr-gnb and nr-ue. "." (run from /ueransim) for the image built from
+  # docker/ueransim; /usr/local/bin for the public gradiant/ueransim image.
+  binPath: "."
   imagePullSecret:
     enabled: True
     name: open5gs-project-secret

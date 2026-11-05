@@ -17,8 +17,15 @@ spec:
         command: ["/bin/sh", "-c"]
         args: 
           - |
-            while : 
-            do 
+            {{- if eq .Values.add_subscribers.wait_for "mongodb" }}
+            until $(command -v mongosh || command -v mongo) --quiet --host {{ .Values.global_config.mongodb_host }} --eval 'db.runCommand({ping: 1}).ok' | grep -q 1
+            do
+              echo "waiting for {{ .Values.global_config.mongodb_host }}"
+              sleep 2
+            done
+            {{- else }}
+            while :
+            do
               status="$(curl -s -o /dev/null -w "%{http_code}" http://open5gs-webui:3000)"
               echo $status
               echo "trying to check connection with open5gs-webui"
@@ -31,8 +38,9 @@ spec:
                 echo "open5gs-webui is not responsive"
               fi
             done
+            {{- end }}
               printf '\n'
-            mongoimport --uri 'mongodb://mongodb-svc:27017' --db open5gs --collection subscribers --file /subscribers/subs_5g.json --type json --jsonArray    
+            mongoimport --uri 'mongodb://{{ .Values.global_config.mongodb_host }}:27017' --db open5gs --collection subscribers --file /subscribers/subs_5g.json --type json --jsonArray --mode=upsert --upsertFields=imsi    
         volumeMounts:
         - name: mongodb-subs-cmap
           mountPath: /subscribers/subs_5g.json

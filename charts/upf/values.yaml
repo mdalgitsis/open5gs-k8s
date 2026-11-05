@@ -8,6 +8,9 @@ open5gs:
     repository: ""   # e.g. ghcr.io/<you>/open5gs - build from docker/open5gs
     tag: "2.6.1"
     pullPolicy: IfNotPresent
+  # Directory holding the open5gs-*d binaries. /open5gs/install/bin for the images built
+  # from docker/open5gs; /opt/open5gs/bin for the public gradiant/open5gs images.
+  binPath: /open5gs/install/bin
 
 # UPF Deployment, Service and ConfigMap
 upf:

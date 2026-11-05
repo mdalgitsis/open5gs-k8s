@@ -22,7 +22,7 @@ spec:
           imagePullPolicy: {{ .Values.ueransim.image.pullPolicy }}
           {{- if .Values.gnb.start_gnb.enabled }}
           command: ["/bin/sh"]
-          args: ["-c", "sleep 5; ./nr-gnb -c config/open5gs-gnb.yaml"]
+          args: ["-c", "sleep 5; cd /ueransim && {{ .Values.ueransim.binPath }}/nr-gnb -c config/open5gs-gnb.yaml"]
           {{- end }}
           ports:
           - name: gnb-ue
